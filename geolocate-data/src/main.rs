@@ -37,6 +37,7 @@ pub enum Error {
     MediaWiki(#[from] mediawiki::MediaWikiError),
 }
 
+/// The application's command-line arguments.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Parser)]
 #[command(about, author, version, long_about = None)]
 pub struct Arguments {
