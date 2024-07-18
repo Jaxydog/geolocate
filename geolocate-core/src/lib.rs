@@ -8,4 +8,6 @@
 pub mod country;
 
 /// The library's default import prelude.
-pub mod prelude {}
+pub mod prelude {
+    pub use crate::country::{Country, CountryCode};
+}
