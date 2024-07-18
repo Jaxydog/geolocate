@@ -1,3 +1,4 @@
+//! The core library and API for geolocate.
 #![cfg_attr(not(debug_assertions), deny(clippy::unwrap_used))]
 #![cfg_attr(not(debug_assertions), warn(missing_docs))]
 #![cfg_attr(debug_assertions, warn(clippy::unwrap_used))]
