@@ -1,0 +1,8 @@
+[workspace]
+members = ["geolocate-*"]
+resolver = "2"
+
+package.edition = "2021"
+package.license = "AGPL-3.0-or-later"
+package.publish = false
+package.repository = "https://github.com/Jaxydog/geolocate"
