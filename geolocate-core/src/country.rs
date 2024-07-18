@@ -4,6 +4,39 @@ use std::str::{Chars, FromStr};
 use serde::de::{Unexpected, Visitor};
 use serde::{Deserialize, Serialize};
 
+/// An ISO-3166 country.
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Country {
+    /// The country's name.
+    pub name: Box<str>,
+    /// The country's code.
+    pub code: CountryCode,
+    /// The country's numeric code.
+    pub numeric: u16,
+}
+
+impl Country {
+    /// Creates a new [`Country`].
+    #[inline]
+    pub fn new(name: impl AsRef<str>, code: CountryCode, numeric: u16) -> Self {
+        Self { name: Box::from(name.as_ref()), code, numeric }
+    }
+}
+
+impl PartialOrd for Country {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Country {
+    #[inline]
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.numeric.cmp(&other.numeric)
+    }
+}
+
 /// An error that is returned when trying to parse an invalid country code.
 #[repr(transparent)]
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -12,6 +45,7 @@ pub struct InvalidCodeError(Box<str>);
 impl std::error::Error for InvalidCodeError {}
 
 impl Display for InvalidCodeError {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "invalid country code: {}", self.0)
     }
@@ -85,6 +119,7 @@ impl Display for CountryCode {
 }
 
 impl Serialize for CountryCode {
+    #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -103,10 +138,12 @@ impl<'de> Deserialize<'de> for CountryCode {
         impl Visitor<'_> for CodeVisitor {
             type Value = CountryCode;
 
+            #[inline]
             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 write!(f, "a valid country code")
             }
 
+            #[inline]
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
             where
                 E: serde::de::Error,
