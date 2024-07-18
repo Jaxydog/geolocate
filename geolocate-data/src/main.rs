@@ -58,6 +58,10 @@ pub fn main() -> Result<()> {
 
     let contents = serde_json::to_vec_pretty(&countries)?;
 
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
     std::fs::write(&path, contents)?;
 
     println!("Wrote {} entries to '{}'", countries.len(), path.to_string_lossy());
