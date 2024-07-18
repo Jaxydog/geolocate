@@ -10,6 +10,253 @@ pub mod v6;
 /// A trait that ensures that [`IpAddrBlock<A>`] can only be used for IP types.
 trait SealedIpAddr: Copy + Ord {}
 
+/// A type that allows values to be mapped to IP address blocks.
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
+pub struct IpAddrBlockMap<A: SealedIpAddr, T> {
+    inner: Vec<(IpAddrBlock<A>, T)>,
+    dirty: bool,
+}
+
+impl<A: SealedIpAddr, T> IpAddrBlockMap<A, T> {
+    /// Creates a new [`IpAddrBlockMap<A, T>`].
+    #[inline]
+    #[must_use]
+    pub const fn new() -> Self {
+        Self { inner: Vec::new(), dirty: false }
+    }
+
+    /// Creates a new [`IpAddrBlockMap<A, T>`] with the given capacity.
+    #[inline]
+    #[must_use]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self { inner: Vec::with_capacity(capacity), dirty: false }
+    }
+
+    /// Returns whether this block map contains the given IP address.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the map is unable to properly search through its inner IP blocks.
+    pub fn contains_address(&self, address: A) -> bool {
+        debug_assert!(!self.dirty, "attempted to read from the map without normalizing");
+
+        self.inner.binary_search_by(|(b, _)| b.partial_cmp(&address).expect("unable to search")).is_ok()
+    }
+
+    /// Returns whether this block map contains the given IP address block.
+    pub fn contains_block(&self, block: IpAddrBlock<A>) -> bool {
+        debug_assert!(!self.dirty, "attempted to read from the map without normalizing");
+
+        self.inner.binary_search_by_key(&block, |(b, _)| *b).is_ok()
+    }
+
+    /// Returns the number of entries within the map.
+    #[inline]
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    /// Returns whether the map is empty.
+    #[inline]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    /// Returns a value associated with the given IP address.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the map is unable to properly search through its inner IP blocks.
+    pub fn get_from_address(&self, address: A) -> Option<&T> {
+        debug_assert!(!self.dirty, "attempted to read from the map without normalizing");
+
+        let index = self.inner.binary_search_by(|(b, _)| {
+            // This should never fail, assuming the PartialOrd impl is correct.
+            b.partial_cmp(&address).expect("unable to search")
+        });
+
+        self.inner.get(index.ok()?).map(|(_, v)| v)
+    }
+
+    /// Returns a value associated with the given IP address.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the map is unable to properly search through its inner IP blocks.
+    pub fn get_from_address_mut(&mut self, address: A) -> Option<&mut T> {
+        debug_assert!(!self.dirty, "attempted to read from the map without normalizing");
+
+        let index = self.inner.binary_search_by(|(b, _)| {
+            // This should never fail, assuming the PartialOrd impl is correct.
+            b.partial_cmp(&address).expect("unable to search")
+        });
+
+        self.inner.get_mut(index.ok()?).map(|(_, v)| v)
+    }
+
+    /// Returns a value associated with the given IP address block.
+    pub fn get_from_block(&self, block: IpAddrBlock<A>) -> Option<&T> {
+        debug_assert!(!self.dirty, "attempted to read from the map without normalizing");
+
+        let index = self.inner.binary_search_by_key(&block, |(b, _)| *b);
+
+        self.inner.get(index.ok()?).map(|(_, v)| v)
+    }
+
+    /// Returns a value associated with the given IP address block.
+    pub fn get_from_block_mut(&mut self, block: IpAddrBlock<A>) -> Option<&mut T> {
+        debug_assert!(!self.dirty, "attempted to read from the map without normalizing");
+
+        let index = self.inner.binary_search_by_key(&block, |(b, _)| *b);
+
+        self.inner.get_mut(index.ok()?).map(|(_, v)| v)
+    }
+
+    /// Normalizes the internal map of this [`IpAddrBlockMap<A, T>`].
+    pub fn normalize(&mut self) {
+        self.inner.dedup_by(|(a, _), (b, _)| a == b);
+        self.inner.sort_unstable_by_key(|(b, _)| (b.0, b.1));
+        self.inner.shrink_to_fit();
+
+        self.dirty = false;
+    }
+
+    /// Inserts a block-assigned value into the map, without ensuring that it is sorted afterwards.
+    ///
+    /// There is no guarantee that after this method is called the inner map will be sorted.
+    ///
+    /// This function will only ever return a value during insertion if the map *is* sorted properly.
+    ///
+    /// # Safety
+    ///
+    /// You must manually ensure that, before calling any method that attempts to search the map, that the inner map is
+    /// sorted. This can be done using [`normalize`](<IpAddrBlockMap::normalize>).
+    pub unsafe fn insert_unstable(&mut self, block: IpAddrBlock<A>, value: T) -> Option<T> {
+        let index = if self.dirty { Err(0) } else { self.inner.binary_search_by_key(&block, |(b, _)| *b) };
+        let previous = index.ok().map(|i| self.inner.swap_remove(i).1);
+
+        self.inner.push((block, value));
+        self.dirty = true;
+
+        previous
+    }
+
+    /// Removes a block-assigned value from the map, without ensuring that it is sorted afterwards.
+    ///
+    /// There is no guarantee that after this method is called the inner map will be sorted.
+    ///
+    /// # Safety
+    ///
+    /// You must manually ensure that, both before calling this method, and before calling any method that attempts to
+    /// search the map, that the inner map is sorted. This can be done using [`normalize`](<IpAddrBlockMap::normalize>).
+    pub unsafe fn remove_unstable(&mut self, block: IpAddrBlock<A>) -> Option<T> {
+        debug_assert!(!self.dirty, "attempted to read from the map without normalizing");
+
+        let index = self.inner.binary_search_by_key(&block, |(b, _)| *b).ok()?;
+
+        Some(self.inner.swap_remove(index).1)
+    }
+
+    /// Inserts a block-assigned value into the map, returning the previous value if present.
+    pub fn insert(&mut self, block: IpAddrBlock<A>, value: T) -> Option<T> {
+        // Ensure that we normalize so that the return value works properly.
+        if self.dirty {
+            self.normalize();
+        }
+
+        match self.inner.binary_search_by_key(&block, |(b, _)| *b) {
+            Ok(index) => Some(std::mem::replace(&mut self.inner[index], (block, value)).1),
+            Err(index) => {
+                self.inner.insert(index, (block, value));
+                None
+            }
+        }
+    }
+
+    /// Removes a block-assigned value from the map, returning it.
+    pub fn remove(&mut self, block: IpAddrBlock<A>) -> Option<T> {
+        // Ensure that we normalize so that the return value works properly.
+        if self.dirty {
+            self.normalize();
+        }
+
+        let index = self.inner.binary_search_by_key(&block, |(b, _)| *b).ok()?;
+
+        Some(self.inner.remove(index).1)
+    }
+
+    /// Removes all elements from the map.
+    pub fn clear(&mut self) {
+        self.inner.clear();
+        self.dirty = false;
+    }
+
+    /// Returns an iterator of references to the blocks within this map.
+    pub fn blocks(&self) -> impl Iterator<Item = &IpAddrBlock<A>> {
+        debug_assert!(!self.dirty, "attempted to read from the map without normalizing");
+
+        self.inner.iter().map(|(b, _)| b)
+    }
+
+    /// Returns an iterator of references to the values within this map.
+    pub fn values(&self) -> impl Iterator<Item = &T> {
+        debug_assert!(!self.dirty, "attempted to read from the map without normalizing");
+
+        self.inner.iter().map(|(_, v)| v)
+    }
+
+    /// Returns an iterator of mutable references to the values within this map.
+    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut T> {
+        debug_assert!(!self.dirty, "attempted to read from the map without normalizing");
+
+        self.inner.iter_mut().map(|(_, v)| v)
+    }
+
+    /// Returns an iterator of references to the entries within this map.
+    pub fn entries(&self) -> impl Iterator<Item = (&IpAddrBlock<A>, &T)> {
+        debug_assert!(!self.dirty, "attempted to read from the map without normalizing");
+
+        self.inner.iter().map(|(b, v)| (b, v))
+    }
+
+    /// Returns an iterator of mutable references to the entries within this map.
+    pub fn entries_mut(&mut self) -> impl Iterator<Item = (&IpAddrBlock<A>, &mut T)> {
+        debug_assert!(!self.dirty, "attempted to read from the map without normalizing");
+
+        self.inner.iter_mut().map(|(b, v)| (&*b, v))
+    }
+}
+
+impl<A: SealedIpAddr, T> IntoIterator for IpAddrBlockMap<A, T> {
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    type Item = (IpAddrBlock<A>, T);
+
+    fn into_iter(self) -> Self::IntoIter {
+        debug_assert!(!self.dirty, "attempted to read from the map without normalizing");
+
+        self.inner.into_iter()
+    }
+}
+
+impl<A: SealedIpAddr, T> FromIterator<(IpAddrBlock<A>, T)> for IpAddrBlockMap<A, T> {
+    fn from_iter<I: IntoIterator<Item = (IpAddrBlock<A>, T)>>(iter: I) -> Self {
+        let mut map = Self { inner: Vec::from_iter(iter), dirty: true };
+
+        map.normalize();
+
+        map
+    }
+}
+
+impl<A: SealedIpAddr, T> Extend<(IpAddrBlock<A>, T)> for IpAddrBlockMap<A, T> {
+    fn extend<I: IntoIterator<Item = (IpAddrBlock<A>, T)>>(&mut self, iter: I) {
+        self.inner.extend(iter);
+        self.normalize();
+    }
+}
+
 /// An error that is returned when trying to create an [`IpAddrBlock<A>`] using an empty or overlapping address range.
 #[repr(transparent)]
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
