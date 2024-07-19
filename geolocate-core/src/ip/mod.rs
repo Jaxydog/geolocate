@@ -7,17 +7,17 @@ pub mod v4;
 /// The IPv6-specific API.
 pub mod v6;
 
-/// A trait that ensures that [`IpAddrBlock<A>`] can only be used for IP types.
-trait SealedIpAddr: Copy + Ord {}
+/// A trait that allows a type of be used within an [`IpAddrBlock<A>`].
+pub trait Address: Copy + Ord {}
 
 /// A type that allows values to be mapped to IP address blocks.
 #[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
-pub struct IpAddrBlockMap<A: SealedIpAddr, T> {
+pub struct IpAddrBlockMap<A: Address, T> {
     inner: Vec<(IpAddrBlock<A>, T)>,
     dirty: bool,
 }
 
-impl<A: SealedIpAddr, T> IpAddrBlockMap<A, T> {
+impl<A: Address, T> IpAddrBlockMap<A, T> {
     /// Creates a new [`IpAddrBlockMap<A, T>`].
     #[inline]
     #[must_use]
@@ -229,7 +229,7 @@ impl<A: SealedIpAddr, T> IpAddrBlockMap<A, T> {
     }
 }
 
-impl<A: SealedIpAddr, T> IntoIterator for IpAddrBlockMap<A, T> {
+impl<A: Address, T> IntoIterator for IpAddrBlockMap<A, T> {
     type IntoIter = std::vec::IntoIter<Self::Item>;
     type Item = (IpAddrBlock<A>, T);
 
@@ -240,7 +240,7 @@ impl<A: SealedIpAddr, T> IntoIterator for IpAddrBlockMap<A, T> {
     }
 }
 
-impl<A: SealedIpAddr, T> FromIterator<(IpAddrBlock<A>, T)> for IpAddrBlockMap<A, T> {
+impl<A: Address, T> FromIterator<(IpAddrBlock<A>, T)> for IpAddrBlockMap<A, T> {
     fn from_iter<I: IntoIterator<Item = (IpAddrBlock<A>, T)>>(iter: I) -> Self {
         let mut map = Self { inner: Vec::from_iter(iter), dirty: true };
 
@@ -250,7 +250,7 @@ impl<A: SealedIpAddr, T> FromIterator<(IpAddrBlock<A>, T)> for IpAddrBlockMap<A,
     }
 }
 
-impl<A: SealedIpAddr, T> Extend<(IpAddrBlock<A>, T)> for IpAddrBlockMap<A, T> {
+impl<A: Address, T> Extend<(IpAddrBlock<A>, T)> for IpAddrBlockMap<A, T> {
     fn extend<I: IntoIterator<Item = (IpAddrBlock<A>, T)>>(&mut self, iter: I) {
         self.inner.extend(iter);
         self.normalize();
@@ -273,9 +273,9 @@ impl Display for EmptyBlockError {
 
 /// An IP address block.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct IpAddrBlock<A: SealedIpAddr>(A, A);
+pub struct IpAddrBlock<A: Address>(A, A);
 
-impl<A: SealedIpAddr> IpAddrBlock<A> {
+impl<A: Address> IpAddrBlock<A> {
     /// Creates a new [`IpAddrBlock<A>`].
     ///
     /// # Panics
@@ -346,14 +346,14 @@ impl<A: SealedIpAddr> IpAddrBlock<A> {
     }
 }
 
-impl<A: SealedIpAddr> PartialEq<A> for IpAddrBlock<A> {
+impl<A: Address> PartialEq<A> for IpAddrBlock<A> {
     #[inline]
     fn eq(&self, other: &A) -> bool {
         self.range().contains(other)
     }
 }
 
-impl<A: SealedIpAddr> PartialOrd<A> for IpAddrBlock<A> {
+impl<A: Address> PartialOrd<A> for IpAddrBlock<A> {
     fn partial_cmp(&self, other: &A) -> Option<Ordering> {
         Some(match other {
             v if self.eq(v) => Ordering::Equal,
@@ -364,7 +364,7 @@ impl<A: SealedIpAddr> PartialOrd<A> for IpAddrBlock<A> {
     }
 }
 
-impl<A: SealedIpAddr> From<A> for IpAddrBlock<A> {
+impl<A: Address> From<A> for IpAddrBlock<A> {
     #[inline]
     fn from(value: A) -> Self {
         // Because blocks use inclusive ranges, this is not considered empty.
@@ -372,7 +372,7 @@ impl<A: SealedIpAddr> From<A> for IpAddrBlock<A> {
     }
 }
 
-impl<A: SealedIpAddr> TryFrom<(A, A)> for IpAddrBlock<A> {
+impl<A: Address> TryFrom<(A, A)> for IpAddrBlock<A> {
     type Error = EmptyBlockError;
 
     #[inline]
@@ -381,7 +381,7 @@ impl<A: SealedIpAddr> TryFrom<(A, A)> for IpAddrBlock<A> {
     }
 }
 
-impl<A: SealedIpAddr, const N: usize> TryFrom<[A; N]> for IpAddrBlock<A> {
+impl<A: Address, const N: usize> TryFrom<[A; N]> for IpAddrBlock<A> {
     type Error = EmptyBlockError;
 
     #[inline]
@@ -390,7 +390,7 @@ impl<A: SealedIpAddr, const N: usize> TryFrom<[A; N]> for IpAddrBlock<A> {
     }
 }
 
-impl<A: SealedIpAddr> TryFrom<&mut [A]> for IpAddrBlock<A> {
+impl<A: Address> TryFrom<&mut [A]> for IpAddrBlock<A> {
     type Error = EmptyBlockError;
 
     #[inline]
@@ -399,7 +399,7 @@ impl<A: SealedIpAddr> TryFrom<&mut [A]> for IpAddrBlock<A> {
     }
 }
 
-impl<A: SealedIpAddr> TryFrom<Box<[A]>> for IpAddrBlock<A> {
+impl<A: Address> TryFrom<Box<[A]>> for IpAddrBlock<A> {
     type Error = EmptyBlockError;
 
     #[inline]

@@ -8,7 +8,6 @@
 /// Defines countries and their API.
 pub mod country;
 /// Defines the IPv4 and IPv6 block API.
-#[allow(private_bounds)]
 pub mod ip;
 
 /// The library's default import prelude.
