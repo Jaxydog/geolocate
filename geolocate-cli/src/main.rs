@@ -45,7 +45,6 @@ pub struct Arguments {
 #[command(about, author, long_about = None)]
 pub enum Command {
     /// Resolves a single IP address' country of origin.
-    /// By default, this output's the country's English name.
     Resolve {
         /// The IP address to resolve.
         address: IpAddr,
