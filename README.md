@@ -7,13 +7,17 @@ A CLI tool, library, and data generator for IP-to-country conversion.
 This application can be run by simply executing the binary directly.
 
 ```sh
-./geolocate-cli
+./geolocate-cli --help
+# -- or with Cargo --
+cargo run --release --bin geolocate-cli -- --help
 ```
 
-You may also run this program using [Cargo](https://www.rust-lang.org/learn/get-started).
+In order to download a local copy of the ISO-3166 database, you can first run the `geolocate-data` command.
 
 ```sh
-cargo run --bin geolocate-cli --release
+./geolocate-data
+# -- or with Cargo --
+cargo run --release --bin geolocate-data
 ```
 
 ## License
