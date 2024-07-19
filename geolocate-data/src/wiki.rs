@@ -38,8 +38,7 @@ pub struct ResponseBinding {
     /// The country's alpha-2 code.
     pub code: ResponseBindingEntry,
     /// The country's numeric identifier.
-    #[serde(default)]
-    pub numeric: Option<ResponseBindingEntry>,
+    pub numeric: ResponseBindingEntry,
 }
 
 /// A value within a response binding.
@@ -66,11 +65,7 @@ pub fn wiki_data() -> Result<Box<[Country]>> {
 
     for ResponseBinding { name, code, numeric } in response.results.bindings {
         let code = CountryCode::from_str(&code.value)?;
-        let country = if let Some(numeric) = numeric {
-            Country::new(name.value, code, numeric.value.parse()?)
-        } else {
-            Country::new(name.value, code, u16::MAX)
-        };
+        let country = Country::new(name.value, code, numeric.value.parse()?);
 
         countries.push(country);
     }

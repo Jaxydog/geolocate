@@ -15,9 +15,9 @@ cargo run --release --bin geolocate-cli -- --help
 In order to download a local copy of the ISO-3166 database, you can first run the `geolocate-data` command.
 
 ```sh
-./geolocate-data
+./geolocate-data ./data/countries.json
 # -- or with Cargo --
-cargo run --release --bin geolocate-data
+cargo run --release --bin geolocate-data ./data/countries.json
 ```
 
 ## License
