@@ -42,21 +42,21 @@ pub fn run<'c>(
 ) -> Result<()> {
     let mut countries: Box<[_]> = if let Some(filter) = country {
         let country = crate::find_country(&filter, country_iter)?;
-        let ipv4_blocks = display_ipv4.then(|| self::collect_blocks(Some(&filter), ipv4_map.entries()));
-        let ipv6_blocks = display_ipv6.then(|| self::collect_blocks(Some(&filter), ipv6_map.entries()));
+        let ipv4_blocks = display_ipv4.then(|| self::collect_blocks(Some(&filter), ipv4_map.iter()));
+        let ipv6_blocks = display_ipv6.then(|| self::collect_blocks(Some(&filter), ipv6_map.iter()));
 
         Box::new([(MaybeCountry::Present(country), ipv4_blocks.unwrap_or_default(), ipv6_blocks.unwrap_or_default())])
     } else {
         let mut countries: HashMap<_, (Vec<_>, Vec<_>)> = HashMap::new();
 
         if display_ipv4 {
-            for (address_block, country) in ipv4_map.entries() {
+            for (address_block, country) in ipv4_map.iter() {
                 countries.entry(country.clone()).or_default().0.push(*address_block);
             }
         }
 
         if display_ipv6 {
-            for (address_block, country) in ipv6_map.entries() {
+            for (address_block, country) in ipv6_map.iter() {
                 countries.entry(country.clone()).or_default().1.push(*address_block);
             }
         }

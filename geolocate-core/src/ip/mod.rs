@@ -215,14 +215,14 @@ impl<A: Address, T> IpAddrBlockMap<A, T> {
     }
 
     /// Returns an iterator of references to the entries within this map.
-    pub fn entries(&self) -> impl Iterator<Item = (&IpAddrBlock<A>, &T)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&IpAddrBlock<A>, &T)> {
         debug_assert!(!self.dirty, "attempted to read from the map without normalizing");
 
         self.inner.iter().map(|(b, v)| (b, v))
     }
 
     /// Returns an iterator of mutable references to the entries within this map.
-    pub fn entries_mut(&mut self) -> impl Iterator<Item = (&IpAddrBlock<A>, &mut T)> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&IpAddrBlock<A>, &mut T)> {
         debug_assert!(!self.dirty, "attempted to read from the map without normalizing");
 
         self.inner.iter_mut().map(|(b, v)| (&*b, v))
