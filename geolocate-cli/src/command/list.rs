@@ -7,8 +7,9 @@ use clap::Args;
 use geolocate_core::ip::{Address, IpAddrBlock};
 use geolocate_core::prelude::*;
 
+use crate::filter::Filter;
 use crate::map::MaybeCountry;
-use crate::{Filter, Ipv4CountryMap, Ipv6CountryMap};
+use crate::{Ipv4CountryMap, Ipv6CountryMap};
 
 /// The arguments for the 'list' command.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Args)]
@@ -41,7 +42,7 @@ pub fn run<'c>(
     country_iter: impl Iterator<Item = &'c Country>,
 ) -> Result<()> {
     let mut countries: Box<[_]> = if let Some(filter) = country {
-        let country = crate::find_country(&filter, country_iter)?;
+        let country = crate::filter::find_country(&filter, country_iter)?;
         let ipv4_blocks = display_ipv4.then(|| self::collect_blocks(Some(&filter), ipv4_map.iter()));
         let ipv6_blocks = display_ipv6.then(|| self::collect_blocks(Some(&filter), ipv6_map.iter()));
 
