@@ -7,7 +7,6 @@
 #![feature(iter_intersperse)]
 
 use std::collections::HashMap;
-use std::net::IpAddr;
 use std::path::Path;
 
 use anyhow::{anyhow, bail, Result};
@@ -19,12 +18,15 @@ use map::MaybeCountry;
 pub mod ip;
 /// Provides IP-block-map deserializers.
 pub mod map;
+
 /// Provides implementations for each command.
 pub mod command {
     /// The count command.
     pub mod count;
     /// The list command.
     pub mod list;
+    /// The resolve command.
+    pub mod resolve;
 }
 
 /// A map containing IPv4 address blocks and their associated countries.
@@ -57,29 +59,11 @@ pub struct Arguments {
 #[command(about, author, long_about = None)]
 pub enum Command {
     /// Tallies the number of IP addresses assigned per country.
-    Count(command::count::Arguments),
+    Count(crate::command::count::Arguments),
     /// Lists all IP address blocks and their assigned country.
-    List(command::list::Arguments),
+    List(crate::command::list::Arguments),
     /// Resolves a single IP address' country of origin.
-    Resolve {
-        /// The IP address to resolve.
-        address: IpAddr,
-        /// Flag that the IP address is of the IPv4 format.
-        #[arg(short = '4', long = "v4")]
-        v4: bool,
-        /// Flag that the IP address is of the IPv6 format.
-        #[arg(short = '6', long = "v6")]
-        v6: bool,
-        /// Output the country's name.
-        #[arg(short = 'n', long = "name")]
-        name: bool,
-        /// Only output the country's Alpha-2 code.
-        #[arg(short = 'a', long = "alpha-2")]
-        alpha_2: bool,
-        /// Only output the country's numeric code.
-        #[arg(short = 'N', long = "numeric")]
-        numeric: bool,
-    },
+    Resolve(crate::command::resolve::Arguments),
 }
 
 /// A country filter for usage in commands.
@@ -160,62 +144,8 @@ pub fn main() -> Result<()> {
     match arguments.command {
         Command::Count(arguments) => crate::command::count::run(arguments, &ipv4_map, &ipv6_map, countries.values()),
         Command::List(arguments) => crate::command::list::run(arguments, &ipv4_map, &ipv6_map, countries.values()),
-        ref command @ Command::Resolve { .. } => crate::resolve(command, &ipv4_map, &ipv6_map),
+        Command::Resolve(arguments) => crate::command::resolve::run(arguments, &ipv4_map, &ipv6_map),
     }
-}
-
-/// Resolves an IP address.
-///
-/// # Errors
-///
-/// This function will return an error if the given command contains invalid arguments.
-pub fn resolve(
-    command: &Command,
-    ipv4: &Ipv4AddrBlockMap<MaybeCountry>,
-    ipv6: &Ipv6AddrBlockMap<MaybeCountry>,
-) -> Result<()> {
-    let Command::Resolve { address, v4, v6, name, alpha_2, numeric } = command else {
-        bail!("invalid command type");
-    };
-
-    if !name && !alpha_2 && !numeric {
-        return Ok(());
-    }
-
-    let Some(country) = (match (*address, v4, v6) {
-        (IpAddr::V4(address), true, _) | (IpAddr::V4(address), false, false) => ipv4.get_from_address(address),
-        (IpAddr::V6(address), _, true) | (IpAddr::V6(address), false, false) => ipv6.get_from_address(address),
-        _ => bail!("invalid command arguments"),
-    }) else {
-        bail!("unmapped address provided");
-    };
-
-    match country {
-        MaybeCountry::Missing(code) => {
-            if *name {
-                eprintln!("missing country name for alpha-2 code '{code}'");
-            }
-            if *alpha_2 {
-                println!("{code}");
-            }
-            if *numeric {
-                eprintln!("missing numeric code for alpha-2 code '{code}'");
-            }
-        }
-        MaybeCountry::Present(country) => {
-            if *name {
-                println!("{}", country.name);
-            }
-            if *alpha_2 {
-                println!("{}", country.code);
-            }
-            if *numeric {
-                println!("{}", country.numeric);
-            }
-        }
-    }
-
-    Ok(())
 }
 
 /// Attempts to find a country using the given filter.
