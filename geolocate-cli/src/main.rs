@@ -4,6 +4,7 @@
 #![cfg_attr(debug_assertions, warn(clippy::unwrap_used))]
 #![warn(clippy::nursery, clippy::pedantic, clippy::todo)]
 #![allow(clippy::module_name_repetitions)]
+#![feature(iter_intersperse)]
 
 use std::collections::HashMap;
 use std::net::IpAddr;
@@ -11,14 +12,23 @@ use std::path::Path;
 
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
-use geolocate_core::country::{Country, CountryCode};
-use geolocate_core::prelude::{Ipv4AddrBlockMap, Ipv6AddrBlockMap};
+use geolocate_core::prelude::{Country, CountryCode, Ipv4AddrBlockMap, Ipv6AddrBlockMap};
 use map::MaybeCountry;
 
 /// Provides IP address deserializers.
 pub mod ip;
 /// Provides IP-block-map deserializers.
 pub mod map;
+/// Provides implementations for each command.
+pub mod command {
+    /// The list command.
+    pub mod list;
+}
+
+/// A map containing IPv4 address blocks and their associated countries.
+pub type Ipv4CountryMap = Ipv4AddrBlockMap<MaybeCountry>;
+/// A map containing IPv6 address blocks and their associated countries.
+pub type Ipv6CountryMap = Ipv6AddrBlockMap<MaybeCountry>;
 
 /// The application's command-line arguments.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Parser)]
@@ -56,6 +66,8 @@ pub enum Command {
         #[arg(short = '6', long = "v6")]
         v6: bool,
     },
+    /// Lists all IP address blocks and their assigned country.
+    List(crate::command::list::Arguments),
     /// Resolves a single IP address' country of origin.
     Resolve {
         /// The IP address to resolve.
@@ -106,6 +118,7 @@ pub fn main() -> Result<()> {
 
     match arguments.command {
         ref command @ Command::Count { .. } => crate::count(command, &ipv4_map, &ipv6_map),
+        Command::List(arguments) => command::list::run_command(arguments, &ipv4_map, &ipv6_map, countries.values()),
         ref command @ Command::Resolve { .. } => crate::resolve(command, &ipv4_map, &ipv6_map),
     }
 }
