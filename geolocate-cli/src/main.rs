@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::net::IpAddr;
 use std::path::Path;
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand};
 use geolocate_core::prelude::{Country, CountryCode, Ipv4AddrBlockMap, Ipv6AddrBlockMap};
 use map::MaybeCountry;
@@ -21,6 +21,8 @@ pub mod ip;
 pub mod map;
 /// Provides implementations for each command.
 pub mod command {
+    /// The count command.
+    pub mod count;
     /// The list command.
     pub mod list;
 }
@@ -55,19 +57,9 @@ pub struct Arguments {
 #[command(about, author, long_about = None)]
 pub enum Command {
     /// Tallies the number of IP addresses assigned per country.
-    Count {
-        /// Only display the specified number of countries.
-        #[arg(short = 'l', long = "limit")]
-        limit: Option<usize>,
-        /// Only count IP addresses in the IPv4 format.
-        #[arg(short = '4', long = "v4")]
-        v4: bool,
-        /// Only count IP addresses in the IPv6 format.
-        #[arg(short = '6', long = "v6")]
-        v6: bool,
-    },
+    Count(command::count::Arguments),
     /// Lists all IP address blocks and their assigned country.
-    List(crate::command::list::Arguments),
+    List(command::list::Arguments),
     /// Resolves a single IP address' country of origin.
     Resolve {
         /// The IP address to resolve.
@@ -88,6 +80,55 @@ pub enum Command {
         #[arg(short = 'N', long = "numeric")]
         numeric: bool,
     },
+}
+
+/// A country filter for usage in commands.
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Filter<'c> {
+    /// Filters for a specific country.
+    Country(&'c Country),
+    /// Filters for a country with the given name.
+    Name(Box<str>),
+    /// Filters for a country with the given alpha-2 code.
+    Code(CountryCode),
+    /// Filters for a country with the given numeric code.
+    Numeric(u16),
+}
+
+impl Filter<'_> {
+    /// Checks whether the given country matches this filter.
+    #[must_use]
+    pub fn test(&self, country: &Country) -> bool {
+        match self {
+            Self::Country(c) => country == *c,
+            Self::Name(name) => &country.name == name,
+            Self::Code(code) => &country.code == code,
+            Self::Numeric(numeric) => &country.numeric == numeric,
+        }
+    }
+
+    /// Checks whether the given country matches this filter, returning [`None`] if it is not possible to test.
+    #[must_use]
+    pub fn test_maybe(&self, country: &MaybeCountry) -> Option<bool> {
+        match (country, self) {
+            (MaybeCountry::Present(country), _) => Some(self.test(country)),
+            (MaybeCountry::Missing(code_a), Self::Code(code_b)) => Some(code_a == code_b),
+            _ => None,
+        }
+    }
+}
+
+impl From<&str> for Filter<'_> {
+    fn from(value: &str) -> Self {
+        if let Ok(numeric) = value.parse() {
+            return Filter::Numeric(numeric);
+        }
+        if let Ok(code) = value.parse() {
+            return Filter::Code(code);
+        }
+
+        Filter::Name(value.into())
+    }
 }
 
 /// The application's entrypoint.
@@ -117,61 +158,10 @@ pub fn main() -> Result<()> {
     let ipv6_map = crate::map::parse_ipv6_map_file(&arguments.ipv6_source, None, resolve)?;
 
     match arguments.command {
-        ref command @ Command::Count { .. } => crate::count(command, &ipv4_map, &ipv6_map),
-        Command::List(arguments) => command::list::run_command(arguments, &ipv4_map, &ipv6_map, countries.values()),
+        Command::Count(arguments) => crate::command::count::run(arguments, &ipv4_map, &ipv6_map, countries.values()),
+        Command::List(arguments) => crate::command::list::run(arguments, &ipv4_map, &ipv6_map, countries.values()),
         ref command @ Command::Resolve { .. } => crate::resolve(command, &ipv4_map, &ipv6_map),
     }
-}
-
-/// Counts the mapped countries.
-///
-/// # Errors
-///
-/// This function will return an error if the given command contains invalid arguments.
-pub fn count(
-    command: &Command,
-    ipv4: &Ipv4AddrBlockMap<MaybeCountry>,
-    ipv6: &Ipv6AddrBlockMap<MaybeCountry>,
-) -> Result<()> {
-    let Command::Count { limit, v4, v6 } = command else {
-        bail!("invalid command type");
-    };
-    if (!v4 && !v6) || (*v4 && *v6) {
-        bail!("one of `v4` or `v6` must be enabled");
-    }
-
-    if limit.is_some_and(|n| n == 0) {
-        return Ok(());
-    }
-
-    let mut countries = HashMap::<MaybeCountry, usize>::new();
-
-    if *v4 {
-        for country in ipv4.values().cloned() {
-            *countries.entry(country).or_default() += 1;
-        }
-    } else {
-        for country in ipv6.values().cloned() {
-            *countries.entry(country).or_default() += 1;
-        }
-    }
-
-    let mut sorted = countries.into_iter().collect::<Box<[_]>>();
-
-    sorted.sort_unstable_by_key(|(_, n)| *n);
-    sorted.reverse();
-
-    if let Some(limit) = *limit {
-        for (country, count) in sorted.iter().take(limit) {
-            println!("{country}: {count}");
-        }
-    } else {
-        for (country, count) in &sorted {
-            println!("{country}: {count}");
-        }
-    }
-
-    Ok(())
 }
 
 /// Resolves an IP address.
@@ -226,4 +216,20 @@ pub fn resolve(
     }
 
     Ok(())
+}
+
+/// Attempts to find a country using the given filter.
+///
+/// # Errors
+///
+/// This function will return an error if the country could not be found.
+pub fn find_country<'c>(filter: &Filter, mut iter: impl Iterator<Item = &'c Country>) -> Result<Country> {
+    let country = iter.find(|c| filter.test(c)).ok_or_else(|| match filter {
+        Filter::Country(country) => anyhow!("unable to find country '{}'", country.name),
+        Filter::Name(name) => anyhow!("unable to find country '{name}'"),
+        Filter::Code(code) => anyhow!("unable to find country '{code}'"),
+        Filter::Numeric(numeric) => anyhow!("unable to find country #{numeric}"),
+    });
+
+    country.cloned()
 }
