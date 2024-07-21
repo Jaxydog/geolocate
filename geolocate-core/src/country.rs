@@ -52,7 +52,7 @@ impl Display for InvalidCodeError {
 }
 
 /// A country's code.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CountryCode {
     /// An Alpha-2 code.
     Alpha2([char; 2]),
