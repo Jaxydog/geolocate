@@ -37,6 +37,7 @@ pub type Ipv4CountryMap = Ipv4AddrBlockMap<MaybeCountry>;
 pub type Ipv6CountryMap = Ipv6AddrBlockMap<MaybeCountry>;
 
 /// The application's command-line arguments.
+#[non_exhaustive]
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Parser)]
 #[command(about, author, version, long_about = None)]
 pub struct Arguments {
@@ -89,8 +90,8 @@ pub fn main() -> Result<()> {
     let file = std::fs::File::open(&arguments.country_source)?;
     let countries: Box<[Country]> = serde_json::from_reader(file)?;
     let countries: HashMap<CountryCode, Country> = countries.iter().map(|c| (c.code, c.clone())).collect();
-    let resolve = |code: CountryCode| -> Option<Country> { countries.get(&code).cloned() };
 
+    let resolve = |code: CountryCode| -> Option<Country> { countries.get(&code).cloned() };
     let ipv4_map = crate::map::parse_ipv4_map_file(&arguments.ipv4_source, None, resolve)?;
     let ipv6_map = crate::map::parse_ipv6_map_file(&arguments.ipv6_source, None, resolve)?;
 
