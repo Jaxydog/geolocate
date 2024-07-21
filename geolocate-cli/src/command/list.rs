@@ -14,7 +14,7 @@ use crate::{Filter, Ipv4CountryMap, Ipv6CountryMap};
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Args)]
 pub struct Arguments {
     /// Only display the country with this name, alpha-2 code, or numeric code.
-    pub country: Option<Box<str>>,
+    pub country: Option<Filter<'static>>,
     /// Only display the specified number of countries.
     #[arg(short = 'c', long = "country-limit")]
     pub country_limit: Option<NonZeroUsize>,
@@ -40,7 +40,7 @@ pub fn run<'c>(
     ipv6_map: &Ipv6CountryMap,
     country_iter: impl Iterator<Item = &'c Country>,
 ) -> Result<()> {
-    let mut countries: Box<[_]> = if let Some(filter) = country.as_deref().map(Filter::from) {
+    let mut countries: Box<[_]> = if let Some(filter) = country {
         let country = crate::find_country(&filter, country_iter)?;
         let ipv4_blocks = display_ipv4.then(|| self::collect_blocks(Some(&filter), ipv4_map.entries()));
         let ipv6_blocks = display_ipv6.then(|| self::collect_blocks(Some(&filter), ipv6_map.entries()));
