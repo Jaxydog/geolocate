@@ -90,16 +90,18 @@ impl FromStr for CountryCode {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         #[inline]
-        fn array<const N: usize>(iter: &mut Chars<'_>) -> [char; N] {
-            std::array::from_fn(|_| iter.next().unwrap_or_else(|| unreachable!("a character is missing")))
+        fn array<const N: usize>(iter: &mut Chars<'_>) -> Option<[char; N]> {
+            let array = std::array::from_fn(|_| iter.next().unwrap_or_else(|| unreachable!("a character is missing")));
+
+            array.iter().all(char::is_ascii_uppercase).then_some(array)
         }
 
         let mut chars = value.chars();
 
         Ok(match value.chars().count() {
-            2 => Self::Alpha2(array(&mut chars)),
-            3 => Self::Alpha3(array(&mut chars)),
-            4 => Self::Alpha4(array(&mut chars)),
+            2 => array(&mut chars).map_or(Self::Unassigned, Self::Alpha2),
+            3 => array(&mut chars).map_or(Self::Unassigned, Self::Alpha3),
+            4 => array(&mut chars).map_or(Self::Unassigned, Self::Alpha4),
             _ => return Err(InvalidCodeError(value.into())),
         })
     }
