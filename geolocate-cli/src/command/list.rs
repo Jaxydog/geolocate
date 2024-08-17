@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::num::NonZeroUsize;
+use std::path::Path;
 
 use anyhow::Result;
 use clap::Args;
@@ -9,7 +10,6 @@ use geolocate_core::prelude::*;
 
 use crate::filter::Filter;
 use crate::map::MaybeCountry;
-use crate::{Ipv4CountryMap, Ipv6CountryMap};
 
 /// The arguments for the 'list' command.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Args)]
@@ -37,26 +37,44 @@ pub struct Arguments {
 /// This function will return an error if the command failed to execute.
 pub fn run<'c>(
     Arguments { country, country_limit, address_limit, display_ipv4, display_ipv6 }: Arguments,
-    ipv4_map: &Ipv4CountryMap,
-    ipv6_map: &Ipv6CountryMap,
+    ipv4_source: &Path,
+    ipv6_source: &Path,
+    resolve: impl Fn(CountryCode) -> Option<Country> + Copy,
     country_iter: impl Iterator<Item = &'c Country>,
 ) -> Result<()> {
     let mut countries: Box<[_]> = if let Some(filter) = country {
         let country = crate::filter::find_country(&filter, country_iter)?;
-        let ipv4_blocks = display_ipv4.then(|| self::collect_blocks(Some(&filter), ipv4_map.iter()));
-        let ipv6_blocks = display_ipv6.then(|| self::collect_blocks(Some(&filter), ipv6_map.iter()));
+
+        let ipv4_blocks = if display_ipv4 {
+            let ipv4_map = crate::map::parse_ipv4_map_file(ipv4_source, None, resolve)?;
+
+            Some(self::collect_blocks(Some(&filter), ipv4_map.iter()))
+        } else {
+            None
+        };
+        let ipv6_blocks = if display_ipv6 {
+            let ipv6_map = crate::map::parse_ipv6_map_file(ipv6_source, None, resolve)?;
+
+            Some(self::collect_blocks(Some(&filter), ipv6_map.iter()))
+        } else {
+            None
+        };
 
         Box::new([(MaybeCountry::Present(country), ipv4_blocks.unwrap_or_default(), ipv6_blocks.unwrap_or_default())])
     } else {
         let mut countries: HashMap<_, (Vec<_>, Vec<_>)> = HashMap::new();
 
         if display_ipv4 {
+            let ipv4_map = crate::map::parse_ipv4_map_file(ipv4_source, None, resolve)?;
+
             for (address_block, country) in ipv4_map.iter() {
                 countries.entry(country.clone()).or_default().0.push(*address_block);
             }
         }
 
         if display_ipv6 {
+            let ipv6_map = crate::map::parse_ipv6_map_file(ipv6_source, None, resolve)?;
+
             for (address_block, country) in ipv6_map.iter() {
                 countries.entry(country.clone()).or_default().1.push(*address_block);
             }

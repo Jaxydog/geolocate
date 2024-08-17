@@ -1,10 +1,11 @@
 use std::net::IpAddr;
+use std::path::Path;
 
 use anyhow::{bail, Result};
 use clap::Args;
+use geolocate_core::prelude::{Country, CountryCode};
 
 use crate::map::MaybeCountry;
-use crate::{Ipv4CountryMap, Ipv6CountryMap};
 
 /// The arguments for the 'count' command.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Args)]
@@ -29,16 +30,25 @@ pub struct Arguments {
 /// This function will return an error if the command failed to execute.
 pub fn run(
     Arguments { address, mut name, code, numeric }: Arguments,
-    ipv4_map: &Ipv4CountryMap,
-    ipv6_map: &Ipv6CountryMap,
+    ipv4_source: &Path,
+    ipv6_source: &Path,
+    resolve: impl Fn(CountryCode) -> Option<Country> + Copy,
 ) -> Result<()> {
     if !name && !code && !numeric {
         name = true;
     }
 
     let Some(country) = (match address {
-        IpAddr::V4(ip) => ipv4_map.get_from_address(ip),
-        IpAddr::V6(ip) => ipv6_map.get_from_address(ip),
+        IpAddr::V4(ip) => {
+            let ipv4_map = crate::map::parse_ipv4_map_file(ipv4_source, None, resolve)?;
+
+            ipv4_map.get_from_address(ip).cloned()
+        }
+        IpAddr::V6(ip) => {
+            let ipv6_map = crate::map::parse_ipv6_map_file(ipv6_source, None, resolve)?;
+
+            ipv6_map.get_from_address(ip).cloned()
+        }
     }) else {
         bail!("the given ip address is unmapped");
     };

@@ -90,14 +90,25 @@ pub fn main() -> Result<()> {
     let file = std::fs::File::open(&arguments.country_source)?;
     let countries: Box<[Country]> = serde_json::from_reader(file)?;
     let countries: HashMap<CountryCode, Country> = countries.iter().map(|c| (c.code, c.clone())).collect();
-
     let resolve = |code: CountryCode| -> Option<Country> { countries.get(&code).cloned() };
-    let ipv4_map = crate::map::parse_ipv4_map_file(&arguments.ipv4_source, None, resolve)?;
-    let ipv6_map = crate::map::parse_ipv6_map_file(&arguments.ipv6_source, None, resolve)?;
 
     match arguments.command {
-        Command::Count(arguments) => crate::command::count::run(arguments, &ipv4_map, &ipv6_map, countries.values()),
-        Command::List(arguments) => crate::command::list::run(arguments, &ipv4_map, &ipv6_map, countries.values()),
-        Command::Resolve(arguments) => crate::command::resolve::run(arguments, &ipv4_map, &ipv6_map),
+        Command::Count(command_arguments) => crate::command::count::run(
+            command_arguments,
+            &arguments.ipv4_source,
+            &arguments.ipv6_source,
+            resolve,
+            countries.values(),
+        ),
+        Command::List(command_arguments) => crate::command::list::run(
+            command_arguments,
+            &arguments.ipv4_source,
+            &arguments.ipv6_source,
+            resolve,
+            countries.values(),
+        ),
+        Command::Resolve(command_arguments) => {
+            crate::command::resolve::run(command_arguments, &arguments.ipv4_source, &arguments.ipv6_source, resolve)
+        }
     }
 }
