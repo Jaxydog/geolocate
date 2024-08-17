@@ -2,7 +2,7 @@
 name = "geolocate-cli"
 description = "A CLI for geolocate-core that allows for the resolution of IP addresses to their countries."
 authors = ["Jaxydog"]
-version = "0.1.0"
+version = "0.1.1"
 
 edition.workspace = true
 license.workspace = true
