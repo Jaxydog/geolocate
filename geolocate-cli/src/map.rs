@@ -119,7 +119,7 @@ where
         let (block, code) = compute(entry?)?;
         let country = resolve(code).map_or(MaybeCountry::Missing(code), MaybeCountry::Present);
 
-        unsafe { map.insert_unstable(block, country) };
+        map.insert_unstable(block, country);
     }
 
     map.normalize();

@@ -129,11 +129,9 @@ impl<A: Address, T> IpAddrBlockMap<A, T> {
     ///
     /// This function will only ever return a value during insertion if the map *is* sorted properly.
     ///
-    /// # Safety
-    ///
     /// You must manually ensure that, before calling any method that attempts to search the map, that the inner map is
     /// sorted. This can be done using [`normalize`](<IpAddrBlockMap::normalize>).
-    pub unsafe fn insert_unstable(&mut self, block: IpAddrBlock<A>, value: T) -> Option<T> {
+    pub fn insert_unstable(&mut self, block: IpAddrBlock<A>, value: T) -> Option<T> {
         let index = if self.dirty { Err(0) } else { self.inner.binary_search_by_key(&block, |(b, _)| *b) };
         let previous = index.ok().map(|i| self.inner.swap_remove(i).1);
 
@@ -147,11 +145,9 @@ impl<A: Address, T> IpAddrBlockMap<A, T> {
     ///
     /// There is no guarantee that after this method is called the inner map will be sorted.
     ///
-    /// # Safety
-    ///
     /// You must manually ensure that, both before calling this method, and before calling any method that attempts to
     /// search the map, that the inner map is sorted. This can be done using [`normalize`](<IpAddrBlockMap::normalize>).
-    pub unsafe fn remove_unstable(&mut self, block: IpAddrBlock<A>) -> Option<T> {
+    pub fn remove_unstable(&mut self, block: IpAddrBlock<A>) -> Option<T> {
         debug_assert!(!self.dirty, "attempted to read from the map without normalizing");
 
         let index = self.inner.binary_search_by_key(&block, |(b, _)| *b).ok()?;
