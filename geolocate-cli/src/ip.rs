@@ -26,14 +26,7 @@ where
         where
             E: serde::de::Error,
         {
-            const CHUNK_SIZE: usize = u8::BITS as usize;
-            const CHUNK_MASK: u32 = u8::MAX as u32;
-
-            Ok(Ipv4Addr::from(std::array::from_fn(|index| {
-                let shift = (3 - index) * CHUNK_SIZE;
-
-                ((v >> shift) & CHUNK_MASK) as u8
-            })))
+            Ok(Ipv4Addr::from_bits(v))
         }
 
         fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
@@ -69,14 +62,7 @@ where
         where
             E: serde::de::Error,
         {
-            const CHUNK_SIZE: usize = u16::BITS as usize;
-            const CHUNK_MASK: u128 = u16::MAX as u128;
-
-            Ok(Ipv6Addr::from(std::array::from_fn(|index| {
-                let shift = (3 - index) * CHUNK_SIZE;
-
-                ((v >> shift) & CHUNK_MASK) as u16
-            })))
+            Ok(Ipv6Addr::from_bits(v))
         }
 
         fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
