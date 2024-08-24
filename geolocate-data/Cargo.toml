@@ -2,7 +2,7 @@
 name = "geolocate-data"
 description = "A utility tool for downloading and parsing a database of countries."
 authors = ["Jaxydog"]
-version = "0.1.0"
+version = "0.1.1"
 
 edition.workspace = true
 license.workspace = true
