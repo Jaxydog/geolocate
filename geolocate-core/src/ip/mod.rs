@@ -7,8 +7,13 @@ pub mod v4;
 /// The IPv6-specific API.
 pub mod v6;
 
+#[doc(hidden)]
+pub(crate) mod private {
+    pub trait Sealed {}
+}
+
 /// A trait that allows a type of be used within an [`IpAddrBlock<A>`].
-pub trait Address: Copy + Ord {}
+pub trait Address: Copy + Ord + private::Sealed {}
 
 /// A type that allows values to be mapped to IP address blocks.
 #[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]

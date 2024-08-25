@@ -6,3 +6,5 @@ pub type Ipv6AddrBlock = super::IpAddrBlock<Ipv6Addr>;
 pub type Ipv6AddrBlockMap<T> = super::IpAddrBlockMap<Ipv6Addr, T>;
 
 impl super::Address for Ipv6Addr {}
+
+impl super::private::Sealed for Ipv6Addr {}
